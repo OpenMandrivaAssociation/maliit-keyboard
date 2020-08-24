@@ -1,4 +1,4 @@
-%define date 20200820
+%define date 20200824
 
 Name:          maliit-keyboard
 Version:       0.0.0
@@ -28,6 +28,7 @@ BuildRequires: doxygen
 BuildRequires: presage-text2ngram
 
 Requires:	maliit
+Requires:	presage
 
 %description
 Maliit provides a flexible and cross-platform input method plugins. It has a
