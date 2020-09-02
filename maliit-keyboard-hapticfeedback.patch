@@ -1,0 +1,307 @@
+diff -up keyboard-master/CMakeLists.txt.omv~ keyboard-master/CMakeLists.txt
+--- keyboard-master/CMakeLists.txt.omv~	2020-09-02 16:40:23.445176446 +0200
++++ keyboard-master/CMakeLists.txt	2020-09-02 17:42:16.745572936 +0200
+@@ -34,7 +34,6 @@ find_package(GIO REQUIRED)
+ find_package(Qt5DBus)
+ 
+ find_package(Qt5Multimedia)
+-find_package(Qt5Feedback)
+ 
+ find_package(Anthy)
+ find_package(Pinyin)
+@@ -150,6 +149,9 @@ target_compile_definitions(gsettings-qt
+ set(MALIIT_KEYBOARD_COMMON_SOURCES
+         src/plugin/editor.cpp
+         src/plugin/editor.h
++	src/plugin/hapticfeedback.cpp
++	src/plugin/hapticfeedback.h
++	src/plugin/bitfield.h
+         src/plugin/feedback.cpp
+         src/plugin/feedback.h
+         src/plugin/greeterstatus.cpp
+@@ -167,10 +169,6 @@ set(MALIIT_KEYBOARD_COMMON_SOURCES
+ 
+ add_library(maliit-keyboard-common STATIC ${MALIIT_KEYBOARD_COMMON_SOURCES})
+ target_link_libraries(maliit-keyboard-common Qt5::DBus Maliit::Plugins maliit-keyboard-lib maliit-keyboard-view gsettings-qt Qt5::Multimedia)
+-if (Qt5Feedback_FOUND)
+-    target_link_libraries(maliit-keyboard-common Qt5::Feedback)
+-    target_compile_definitions(maliit-keyboard-common PUBLIC HAVE_QT5_FEEDBACK)
+-endif()
+ target_compile_definitions(maliit-keyboard-common PRIVATE ${maliit-keyboard-definitions})
+ target_compile_features(maliit-keyboard-common PRIVATE cxx_std_17)
+ 
+diff -up keyboard-master/src/plugin/bitfield.h.omv~ keyboard-master/src/plugin/bitfield.h
+--- keyboard-master/src/plugin/bitfield.h.omv~	2020-09-02 16:11:45.474641479 +0200
++++ keyboard-master/src/plugin/bitfield.h	2020-09-02 16:13:53.984696494 +0200
+@@ -0,0 +1,33 @@
++/* BitField class that, unlike std::bitset, works with
++ * C style input (memset/memcpy/...), and therefore with
++ * ioctl output without conversions
++ *
++ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ *
++ * Released under the GPLv3
++ */
++
++#pragma once
++
++#include <cstdint>
++#include <cstring>
++
++template<size_t s> class BitField {
++public:
++	BitField() { memset(data, 0, sizeof(data)); }
++	operator void*() { return static_cast<void*>(&data); }
++	bool isSet(int bit) const {
++		return (data[(bit/8)]>>(bit%8))&1;
++	}
++	void set(int bit) {
++		data[(bit/8)] |= 1<<(bit%8);
++	}
++	void clear(int bit) {
++		data[(bit/8)] &= ~(1<<(bit%8));
++	}
++	bool operator[](int bit) const {
++		return isSet(bit);
++	}
++private:
++	uint8_t data[1+s/8];
++};
+diff -up keyboard-master/src/plugin/feedback.cpp.omv~ keyboard-master/src/plugin/feedback.cpp
+--- keyboard-master/src/plugin/feedback.cpp.omv~	2020-09-02 00:53:46.271473037 +0200
++++ keyboard-master/src/plugin/feedback.cpp	2020-09-02 17:44:58.417641806 +0200
+@@ -15,13 +15,11 @@
+  */
+ 
+ #include "feedback.h"
++#include "hapticfeedback.h"
+ 
+ #include "keyboardsettings.h"
+ 
+ #include <QtMultimedia/QSoundEffect>
+-#ifdef HAVE_QT5_FEEDBACK
+-#include <QtFeedback/QFeedbackHapticsEffect>
+-#endif
+ 
+ #include <memory>
+ 
+@@ -31,22 +29,13 @@ Feedback::Feedback(const KeyboardSetting
+     : QObject()
+     , m_settings(settings)
+     , m_audioEffect(std::make_unique<QSoundEffect>())
+-#ifdef HAVE_QT5_FEEDBACK
+-    , m_pressEffect(std::make_unique<QFeedbackHapticsEffect>())
+-#endif
++    , m_pressEffect(nullptr)
+ {
+     connect(settings, &KeyboardSettings::keyPressAudioFeedbackChanged, this, &Feedback::useAudioFeedbackChanged);
+     connect(settings, &KeyboardSettings::keyPressAudioFeedbackSoundChanged, this, &Feedback::audioFeedbackSoundChanged);
+     connect(settings, &KeyboardSettings::keyPressHapticFeedbackChanged, this, &Feedback::useHapticFeedbackChanged);
+     m_audioEffect->setSource(QUrl(audioFeedbackSound()));
+-#ifdef HAVE_QT5_FEEDBACK
+-    m_pressEffect->setAttackIntensity(0.0);
+-    m_pressEffect->setAttackTime(50);
+-    m_pressEffect->setIntensity(1.0);
+-    m_pressEffect->setDuration(10);
+-    m_pressEffect->setFadeTime(50);
+-    m_pressEffect->setFadeIntensity(0.0);
+-#endif
++    m_pressEffect=new HapticFeedback();
+ }
+ 
+ Feedback::~Feedback() = default;
+@@ -59,10 +48,8 @@ void Feedback::playAudio()
+ 
+ void Feedback::startPressEffect()
+ {
+-#ifdef HAVE_QT5_FEEDBACK
+     if (useHapticFeedback())
+         m_pressEffect->start();
+-#endif
+ }
+ 
+ void Feedback::keyPressed()
+@@ -86,4 +73,4 @@ bool Feedback::useHapticFeedback() const
+     return m_settings->keyPressHapticFeedback();
+ }
+ 
+-}
+\ No newline at end of file
++}
+diff -up keyboard-master/src/plugin/feedback.h.omv~ keyboard-master/src/plugin/feedback.h
+--- keyboard-master/src/plugin/feedback.h.omv~	2020-09-02 00:53:36.974375629 +0200
++++ keyboard-master/src/plugin/feedback.h	2020-09-02 17:43:32.540073714 +0200
+@@ -18,11 +18,11 @@
+ #define FEEDBACK_H
+ 
+ #include <QObject>
++#include "hapticfeedback.h"
+ 
+ #include <memory>
+ 
+ class QSoundEffect;
+-class QFeedbackHapticsEffect;
+ 
+ namespace MaliitKeyboard
+ {
+@@ -57,9 +57,7 @@ Q_SIGNALS:
+ private:
+     const KeyboardSettings *m_settings;
+     std::unique_ptr<QSoundEffect> m_audioEffect;
+-#ifdef HAVE_QT5_FEEDBACK
+-    std::unique_ptr<QFeedbackHapticsEffect> m_pressEffect;
+-#endif
++    HapticFeedback *m_pressEffect;
+ };
+ 
+ }
+diff -up keyboard-master/src/plugin/hapticfeedback.cpp.omv~ keyboard-master/src/plugin/hapticfeedback.cpp
+--- keyboard-master/src/plugin/hapticfeedback.cpp.omv~	2020-09-02 16:11:54.504715612 +0200
++++ keyboard-master/src/plugin/hapticfeedback.cpp	2020-09-02 17:23:33.513333110 +0200
+@@ -0,0 +1,113 @@
++/* Class to drive the PinePhone (and similar) vibrator
++ *
++ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ *
++ * Released under the GPLv3
++ */
++
++#include "hapticfeedback.h"
++#include "bitfield.h"
++
++#include <QDir>
++#include <QFile>
++#include <iostream>
++
++extern "C" {
++#include <fcntl.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++}
++
++HapticFeedback::HapticFeedback(QString const &device):_fd(-1) {
++	if(device.isEmpty()) {
++		// Locate the vibrator -- it'll typically be the first
++		// device that supports the force feedback API and doesn't
++		// look like a joystick/gamepad.
++		QDir devinput("/dev/input");
++		for(QString const &dev : devinput.entryList(QStringList() << "event*", QDir::Readable|QDir::Writable|QDir::System|QDir::NoDotAndDotDot)) {
++			QString d("/dev/input/" + dev);
++			int fd = open(QFile::encodeName(d), O_RDWR);
++			if(fd < 0) {
++				// If we can't open it, can't be the device
++				continue;
++			}
++
++			int effects;
++			if(ioctl(fd, EVIOCGEFFECTS, &effects) < 0) {
++				perror("EVIOCGEFFECTS");
++				close(fd);
++				continue;
++			}
++			if(effects <= 0)
++				continue;
++
++			BitField<FF_MAX> ffFeatures;
++			if(ioctl(fd, EVIOCGBIT(EV_FF, sizeof(ffFeatures)), &ffFeatures) < 0) {
++				perror("EV_FF");
++				close(fd);
++				continue;
++			}
++			if(ffFeatures.isSet(FF_AUTOCENTER)) {
++				// Looks like a joystick -- a vibrator
++				// doesn't really have a center...
++				close(fd);
++				continue;
++			}
++			if(!ffFeatures.isSet(FF_RUMBLE)) {
++				// Doesn't support the mode we use (for now)
++				// let's see if there's another device that does...
++				close(fd);
++				continue;
++			}
++			if(ffFeatures.isSet(FF_GAIN)) {
++				// set gain to 75%
++				input_event gain;
++				memset(&gain, 0, sizeof(gain));
++				gain.type = EV_FF;
++				gain.code = FF_GAIN;
++				gain.value = 0xc000;
++				if(write(fd, &gain, sizeof(gain)) != sizeof(gain))
++					perror("Set gain"); // Probably not fatal...
++			}
++			_fd = fd;
++			break;
++		}
++	} else {
++		_fd = open(QFile::encodeName(device), O_RDWR);
++		if(_fd < 0)
++			return;
++	}
++
++	ff_effect effect[1];
++	memset(&effect, 0, sizeof(effect));
++	effect[0].type = FF_RUMBLE;
++	effect[0].id = -1;
++	effect[0].u.rumble.strong_magnitude = 0xffff;
++	effect[0].u.rumble.weak_magnitude = 0x0;
++	effect[0].replay.length = 250;
++	effect[0].replay.delay = 0;
++	ioctl(_fd, EVIOCSFF, &effect[0]);
++	_effect = effect[0].id;
++}
++
++HapticFeedback::~HapticFeedback() {
++	if(_fd >= 0)
++		close(_fd);
++}
++
++bool HapticFeedback::sendCmd(bool start) {
++	input_event cmd;
++	memset(&cmd, 0, sizeof(input_event));
++	cmd.type = EV_FF;
++	cmd.code = _effect;
++	cmd.value = start ? 1 : 0;
++	return write(_fd, &cmd, sizeof(cmd)) == sizeof(cmd);
++}
++
++void HapticFeedback::start() {
++	sendCmd(true);
++}
++
++void HapticFeedback::stop() {
++	sendCmd(false);
++}
+diff -up keyboard-master/src/plugin/hapticfeedback.h.omv~ keyboard-master/src/plugin/hapticfeedback.h
+--- keyboard-master/src/plugin/hapticfeedback.h.omv~	2020-09-02 16:11:51.199688479 +0200
++++ keyboard-master/src/plugin/hapticfeedback.h	2020-09-02 17:23:13.949213455 +0200
+@@ -0,0 +1,29 @@
++/**
++ * Haptic feedback for devices supporting the
++ * evdev force feedback feature
++ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ * Released under the GPLv3
++ */
++#pragma once
++
++#include <QObject>
++#include <QString>
++
++extern "C" {
++#include <linux/input.h>
++}
++
++class HapticFeedback {
++public:
++	HapticFeedback(QString const &device="");
++	~HapticFeedback();
++	bool isOk() const { return _fd >= 0; }
++public:
++	void start();
++	void stop();
++private:
++	bool sendCmd(bool start);
++private:
++	int 	_fd;
++	int	_effect;
++};
