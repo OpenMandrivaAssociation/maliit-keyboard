@@ -2,7 +2,7 @@
 
 Name:		maliit-keyboard
 Version:	0.0.0
-Release:	%{?date:0.%{date}.}1
+Release:	%{?date:0.%{date}.}2
 Summary:	Virtual keyboard for the maliit input framework
 
 Group:		System/Libraries

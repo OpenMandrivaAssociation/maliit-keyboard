@@ -245,7 +245,7 @@ diff -up keyboard-master/src/plugin/hapticfeedback.cpp.omv~ keyboard-master/src/
 +	effect[0].id = -1;
 +	effect[0].u.rumble.strong_magnitude = 0xffff;
 +	effect[0].u.rumble.weak_magnitude = 0x0;
-+	effect[0].replay.length = 250;
++	effect[0].replay.length = 100;
 +	effect[0].replay.delay = 0;
 +	ioctl(_fd, EVIOCSFF, &effect[0]);
 +	_effect = effect[0].id;
