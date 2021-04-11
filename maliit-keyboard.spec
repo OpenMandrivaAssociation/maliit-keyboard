@@ -1,14 +1,18 @@
-%define date 20201030
+#define date 20201030
 
 Name:		maliit-keyboard
-Version:	0.0.0
-Release:	%{?date:0.%{date}.}2
+Version:	2.0.0
+Release:	%{?date:0.%{date}.}1
 Summary:	Virtual keyboard for the maliit input framework
 
 Group:		System/Libraries
 License:	BSD
 URL:		http://maliit.github.io/
+%if 0%{?date}
 Source0:	https://github.com/maliit/keyboard/archive/master/%{name}-%{date}.tar.gz
+%else
+Source0:	https://github.com/maliit/keyboard/archive/master/%{name}-%{version}.tar.gz
+%endif
 # Drop unmaintained/non-working QFeedback module in favor of a quick
 # and dirty local implementation
 Patch0:		maliit-keyboard-hapticfeedback.patch
@@ -55,3 +59,4 @@ link currently uses D-Bus.
 %{_libdir}/maliit/keyboard2
 %{_datadir}/maliit/keyboard2
 %{_datadir}/glib-2.0/schemas/org.maliit.keyboard.maliit.gschema.xml
+%{_datadir}/applications/com.github.maliit.keyboard.desktop

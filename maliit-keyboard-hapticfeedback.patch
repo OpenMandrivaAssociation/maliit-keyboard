@@ -1,6 +1,6 @@
-diff -up keyboard-master/CMakeLists.txt.omv~ keyboard-master/CMakeLists.txt
---- keyboard-master/CMakeLists.txt.omv~	2020-09-02 16:40:23.445176446 +0200
-+++ keyboard-master/CMakeLists.txt	2020-09-02 17:42:16.745572936 +0200
+diff -up keyboard-master/CMakeLists.txt.1~ keyboard-master/CMakeLists.txt
+--- keyboard-master/CMakeLists.txt.1~	2021-04-08 13:38:15.000000000 +0200
++++ keyboard-master/CMakeLists.txt	2021-04-11 22:53:20.924434770 +0200
 @@ -34,7 +34,6 @@ find_package(GIO REQUIRED)
  find_package(Qt5DBus)
  
@@ -9,7 +9,7 @@ diff -up keyboard-master/CMakeLists.txt.omv~ keyboard-master/CMakeLists.txt
  
  find_package(Anthy)
  find_package(Pinyin)
-@@ -150,6 +149,9 @@ target_compile_definitions(gsettings-qt
+@@ -154,6 +153,9 @@ target_compile_definitions(gsettings-qt
  set(MALIIT_KEYBOARD_COMMON_SOURCES
          src/plugin/editor.cpp
          src/plugin/editor.h
@@ -19,7 +19,7 @@ diff -up keyboard-master/CMakeLists.txt.omv~ keyboard-master/CMakeLists.txt
          src/plugin/feedback.cpp
          src/plugin/feedback.h
          src/plugin/greeterstatus.cpp
-@@ -167,10 +169,6 @@ set(MALIIT_KEYBOARD_COMMON_SOURCES
+@@ -171,10 +173,6 @@ set(MALIIT_KEYBOARD_COMMON_SOURCES
  
  add_library(maliit-keyboard-common STATIC ${MALIIT_KEYBOARD_COMMON_SOURCES})
  target_link_libraries(maliit-keyboard-common Qt5::DBus Maliit::Plugins maliit-keyboard-lib maliit-keyboard-view gsettings-qt Qt5::Multimedia)
@@ -30,15 +30,15 @@ diff -up keyboard-master/CMakeLists.txt.omv~ keyboard-master/CMakeLists.txt
  target_compile_definitions(maliit-keyboard-common PRIVATE ${maliit-keyboard-definitions})
  target_compile_features(maliit-keyboard-common PRIVATE cxx_std_17)
  
-diff -up keyboard-master/src/plugin/bitfield.h.omv~ keyboard-master/src/plugin/bitfield.h
---- keyboard-master/src/plugin/bitfield.h.omv~	2020-09-02 16:11:45.474641479 +0200
-+++ keyboard-master/src/plugin/bitfield.h	2020-09-02 16:13:53.984696494 +0200
+diff -up keyboard-master/src/plugin/bitfield.h.1~ keyboard-master/src/plugin/bitfield.h
+--- keyboard-master/src/plugin/bitfield.h.1~	2021-04-11 22:53:20.924434770 +0200
++++ keyboard-master/src/plugin/bitfield.h	2021-04-11 22:53:20.924434770 +0200
 @@ -0,0 +1,33 @@
 +/* BitField class that, unlike std::bitset, works with
 + * C style input (memset/memcpy/...), and therefore with
 + * ioctl output without conversions
 + *
-+ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ * (C) 2020-2021 Bernhard Rosenkränzer <bero@lindev.ch>
 + *
 + * Released under the GPLv3
 + */
@@ -67,10 +67,10 @@ diff -up keyboard-master/src/plugin/bitfield.h.omv~ keyboard-master/src/plugin/b
 +private:
 +	uint8_t data[1+s/8];
 +};
-diff -up keyboard-master/src/plugin/feedback.cpp.omv~ keyboard-master/src/plugin/feedback.cpp
---- keyboard-master/src/plugin/feedback.cpp.omv~	2020-09-02 00:53:46.271473037 +0200
-+++ keyboard-master/src/plugin/feedback.cpp	2020-09-02 17:44:58.417641806 +0200
-@@ -15,13 +15,11 @@
+diff -up keyboard-master/src/plugin/feedback.cpp.1~ keyboard-master/src/plugin/feedback.cpp
+--- keyboard-master/src/plugin/feedback.cpp.1~	2021-04-08 13:38:15.000000000 +0200
++++ keyboard-master/src/plugin/feedback.cpp	2021-04-11 22:55:32.117708396 +0200
+@@ -26,13 +26,11 @@
   */
  
  #include "feedback.h"
@@ -85,7 +85,7 @@ diff -up keyboard-master/src/plugin/feedback.cpp.omv~ keyboard-master/src/plugin
  
  #include <memory>
  
-@@ -31,22 +29,13 @@ Feedback::Feedback(const KeyboardSetting
+@@ -42,23 +40,14 @@ Feedback::Feedback(const KeyboardSetting
      : QObject()
      , m_settings(settings)
      , m_audioEffect(std::make_unique<QSoundEffect>())
@@ -97,20 +97,21 @@ diff -up keyboard-master/src/plugin/feedback.cpp.omv~ keyboard-master/src/plugin
      connect(settings, &KeyboardSettings::keyPressAudioFeedbackChanged, this, &Feedback::useAudioFeedbackChanged);
      connect(settings, &KeyboardSettings::keyPressAudioFeedbackSoundChanged, this, &Feedback::audioFeedbackSoundChanged);
      connect(settings, &KeyboardSettings::keyPressHapticFeedbackChanged, this, &Feedback::useHapticFeedbackChanged);
-     m_audioEffect->setSource(QUrl(audioFeedbackSound()));
+     m_audioEffect->setSource(QUrl::fromLocalFile(audioFeedbackSound()));
+     m_audioEffect->setVolume(0.1);
 -#ifdef HAVE_QT5_FEEDBACK
 -    m_pressEffect->setAttackIntensity(0.0);
 -    m_pressEffect->setAttackTime(50);
 -    m_pressEffect->setIntensity(1.0);
--    m_pressEffect->setDuration(10);
+-    m_pressEffect->setDuration(150);
 -    m_pressEffect->setFadeTime(50);
 -    m_pressEffect->setFadeIntensity(0.0);
 -#endif
-+    m_pressEffect=new HapticFeedback();
++    m_pressEffect = new HapticFeedback();
  }
  
  Feedback::~Feedback() = default;
-@@ -59,10 +48,8 @@ void Feedback::playAudio()
+@@ -71,10 +60,8 @@ void Feedback::playAudio()
  
  void Feedback::startPressEffect()
  {
@@ -121,17 +122,10 @@ diff -up keyboard-master/src/plugin/feedback.cpp.omv~ keyboard-master/src/plugin
  }
  
  void Feedback::keyPressed()
-@@ -86,4 +73,4 @@ bool Feedback::useHapticFeedback() const
-     return m_settings->keyPressHapticFeedback();
- }
- 
--}
-\ No newline at end of file
-+}
-diff -up keyboard-master/src/plugin/feedback.h.omv~ keyboard-master/src/plugin/feedback.h
---- keyboard-master/src/plugin/feedback.h.omv~	2020-09-02 00:53:36.974375629 +0200
-+++ keyboard-master/src/plugin/feedback.h	2020-09-02 17:43:32.540073714 +0200
-@@ -18,11 +18,11 @@
+diff -up keyboard-master/src/plugin/feedback.h.1~ keyboard-master/src/plugin/feedback.h
+--- keyboard-master/src/plugin/feedback.h.1~	2021-04-08 13:38:15.000000000 +0200
++++ keyboard-master/src/plugin/feedback.h	2021-04-11 22:53:20.924434770 +0200
+@@ -29,11 +29,11 @@
  #define FEEDBACK_H
  
  #include <QObject>
@@ -144,7 +138,7 @@ diff -up keyboard-master/src/plugin/feedback.h.omv~ keyboard-master/src/plugin/f
  
  namespace MaliitKeyboard
  {
-@@ -57,9 +57,7 @@ Q_SIGNALS:
+@@ -68,9 +68,7 @@ Q_SIGNALS:
  private:
      const KeyboardSettings *m_settings;
      std::unique_ptr<QSoundEffect> m_audioEffect;
@@ -155,13 +149,13 @@ diff -up keyboard-master/src/plugin/feedback.h.omv~ keyboard-master/src/plugin/f
  };
  
  }
-diff -up keyboard-master/src/plugin/hapticfeedback.cpp.omv~ keyboard-master/src/plugin/hapticfeedback.cpp
---- keyboard-master/src/plugin/hapticfeedback.cpp.omv~	2020-09-02 16:11:54.504715612 +0200
-+++ keyboard-master/src/plugin/hapticfeedback.cpp	2020-09-02 17:23:33.513333110 +0200
+diff -up keyboard-master/src/plugin/hapticfeedback.cpp.1~ keyboard-master/src/plugin/hapticfeedback.cpp
+--- keyboard-master/src/plugin/hapticfeedback.cpp.1~	2021-04-11 22:53:20.924434770 +0200
++++ keyboard-master/src/plugin/hapticfeedback.cpp	2021-04-11 22:53:20.924434770 +0200
 @@ -0,0 +1,113 @@
 +/* Class to drive the PinePhone (and similar) vibrator
 + *
-+ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ * (C) 2020-2021 Bernhard Rosenkränzer <bero@lindev.ch>
 + *
 + * Released under the GPLv3
 + */
@@ -245,7 +239,7 @@ diff -up keyboard-master/src/plugin/hapticfeedback.cpp.omv~ keyboard-master/src/
 +	effect[0].id = -1;
 +	effect[0].u.rumble.strong_magnitude = 0xffff;
 +	effect[0].u.rumble.weak_magnitude = 0x0;
-+	effect[0].replay.length = 100;
++	effect[0].replay.length = 90;
 +	effect[0].replay.delay = 0;
 +	ioctl(_fd, EVIOCSFF, &effect[0]);
 +	_effect = effect[0].id;
@@ -272,14 +266,14 @@ diff -up keyboard-master/src/plugin/hapticfeedback.cpp.omv~ keyboard-master/src/
 +void HapticFeedback::stop() {
 +	sendCmd(false);
 +}
-diff -up keyboard-master/src/plugin/hapticfeedback.h.omv~ keyboard-master/src/plugin/hapticfeedback.h
---- keyboard-master/src/plugin/hapticfeedback.h.omv~	2020-09-02 16:11:51.199688479 +0200
-+++ keyboard-master/src/plugin/hapticfeedback.h	2020-09-02 17:23:13.949213455 +0200
+diff -up keyboard-master/src/plugin/hapticfeedback.h.1~ keyboard-master/src/plugin/hapticfeedback.h
+--- keyboard-master/src/plugin/hapticfeedback.h.1~	2021-04-11 22:53:20.924434770 +0200
++++ keyboard-master/src/plugin/hapticfeedback.h	2021-04-11 22:53:20.924434770 +0200
 @@ -0,0 +1,29 @@
 +/**
 + * Haptic feedback for devices supporting the
 + * evdev force feedback feature
-+ * (C) 2020 Bernhard Rosenkränzer <bero@lindev.ch>
++ * (C) 2020-2021 Bernhard Rosenkränzer <bero@lindev.ch>
 + * Released under the GPLv3
 + */
 +#pragma once
