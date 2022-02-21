@@ -1,7 +1,7 @@
 #define date 20201030
 
 Name:		maliit-keyboard
-Version:	2.0.0
+Version:	2.2.0
 Release:	%{?date:0.%{date}.}1
 Summary:	Virtual keyboard for the maliit input framework
 
