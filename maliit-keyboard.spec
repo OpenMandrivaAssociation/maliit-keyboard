@@ -43,7 +43,7 @@ communicate with the Maliit server via input context plugins. The communication
 link currently uses D-Bus.
 
 %prep
-%autosetup -p1 -n keyboard-master
+%autosetup -p1 -n keyboard-%{version}
 %cmake_kde5
 
 %build
