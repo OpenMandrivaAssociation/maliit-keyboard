@@ -7,7 +7,7 @@ Summary:	Virtual keyboard for the maliit input framework
 
 Group:		System/Libraries
 License:	BSD
-URL:		http://maliit.github.io/
+URL:		https://maliit.github.io/
 %if 0%{?date}
 Source0:	https://github.com/maliit/keyboard/archive/master/%{name}-%{date}.tar.gz
 %else
